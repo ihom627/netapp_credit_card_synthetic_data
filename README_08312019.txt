@@ -1,0 +1,285 @@
+#credit card synthetic data use-case
+
+#use kaggle credit card data and expand on the dataset
+#https://www.kaggle.com/mlg-ulb/creditcardfraud/downloads/creditcardfraud.zip/3
+
+#Observations:
+#- the features are all numeric
+#- the features are the result of PCA analysis, so they are independent basis of each other      
+
+#Approach is to create histogram of data columns, identify underlying distribution and randomly sample
+#when creating a new transaction
+
+
+library(dplyr)
+
+
+#load in data set
+dat = read.csv("creditcard.csv", header = TRUE)
+
+> summary(dat)
+      Time              V1                  V2                  V3          
+ Min.   :     0   Min.   :-56.40751   Min.   :-72.71573   Min.   :-48.3256  
+ 1st Qu.: 54202   1st Qu.: -0.92037   1st Qu.: -0.59855   1st Qu.: -0.8904  
+ Median : 84692   Median :  0.01811   Median :  0.06549   Median :  0.1799  
+ Mean   : 94814   Mean   :  0.00000   Mean   :  0.00000   Mean   :  0.0000  
+ 3rd Qu.:139320   3rd Qu.:  1.31564   3rd Qu.:  0.80372   3rd Qu.:  1.0272  
+ Max.   :172792   Max.   :  2.45493   Max.   : 22.05773   Max.   :  9.3826  
+
+      V28                Amount             Class         
+ Min.   :-15.43008   Min.   :    0.00   Min.   :0.000000  
+ 1st Qu.: -0.05296   1st Qu.:    5.60   1st Qu.:0.000000  
+ Median :  0.01124   Median :   22.00   Median :0.000000  
+ Mean   :  0.00000   Mean   :   88.35   Mean   :0.001728  
+ 3rd Qu.:  0.07828   3rd Qu.:   77.17   3rd Qu.:0.000000  
+ Max.   : 33.84781   Max.   :25691.16   Max.   :1.000000  
+
+
+str(dat)
+'data.frame':	284807 obs. of  31 variables:
+ $ Time  : num  0 0 1 1 2 2 4 7 7 9 ...
+ $ V1    : num  -1.36 1.192 -1.358 -0.966 -1.158 ...
+ $ V2    : num  -0.0728 0.2662 -1.3402 -0.1852 0.8777 ...
+ $ V3    : num  2.536 0.166 1.773 1.793 1.549 ...
+ $ V4    : num  1.378 0.448 0.38 -0.863 0.403 ...
+ $ V5    : num  -0.3383 0.06 -0.5032 -0.0103 -0.4072 ...
+ $ V6    : num  0.4624 -0.0824 1.8005 1.2472 0.0959 ...
+ $ V7    : num  0.2396 -0.0788 0.7915 0.2376 0.5929 ...
+ $ V8    : num  0.0987 0.0851 0.2477 0.3774 -0.2705 ...
+ $ V9    : num  0.364 -0.255 -1.515 -1.387 0.818 ...
+ $ V10   : num  0.0908 -0.167 0.2076 -0.055 0.7531 ...
+ $ V11   : num  -0.552 1.613 0.625 -0.226 -0.823 ...
+ $ V12   : num  -0.6178 1.0652 0.0661 0.1782 0.5382 ...
+ $ V13   : num  -0.991 0.489 0.717 0.508 1.346 ...
+ $ V14   : num  -0.311 -0.144 -0.166 -0.288 -1.12 ...
+ $ V15   : num  1.468 0.636 2.346 -0.631 0.175 ...
+ $ V16   : num  -0.47 0.464 -2.89 -1.06 -0.451 ...
+ $ V17   : num  0.208 -0.115 1.11 -0.684 -0.237 ...
+ $ V18   : num  0.0258 -0.1834 -0.1214 1.9658 -0.0382 ...
+ $ V19   : num  0.404 -0.146 -2.262 -1.233 0.803 ...
+ $ V20   : num  0.2514 -0.0691 0.525 -0.208 0.4085 ...
+ $ V21   : num  -0.01831 -0.22578 0.248 -0.1083 -0.00943 ...
+ $ V22   : num  0.27784 -0.63867 0.77168 0.00527 0.79828 ...
+ $ V23   : num  -0.11 0.101 0.909 -0.19 -0.137 ...
+ $ V24   : num  0.0669 -0.3398 -0.6893 -1.1756 0.1413 ...
+ $ V25   : num  0.129 0.167 -0.328 0.647 -0.206 ...
+ $ V26   : num  -0.189 0.126 -0.139 -0.222 0.502 ...
+ $ V27   : num  0.13356 -0.00898 -0.05535 0.06272 0.21942 ...
+ $ V28   : num  -0.0211 0.0147 -0.0598 0.0615 0.2152 ...
+ $ Amount: num  149.62 2.69 378.66 123.5 69.99 ...
+ $ Class : int  0 0 0 0 0 0 0 0 0 0 ...
+
+
+#number of rows
+nrow(dat)
+[1] 284807
+
+#count distinct values in Class
+distinct(dat$Class)
+
+
+#just pilot with one column V1, then will apply to all
+
+hist(dat$V1, breaks= 400)
+
+#can also create density plot rather than just freq count
+hist(dat$V1, breaks= 400, freq=FALSE)
+
+#get the empircal mean and std
+mean(dat$V1)
+[1] 1.166582e-15
+
+sd(dat$V1)
+[1] 1.958696
+
+#now add a normal distribution curve over it
+#curve(dnorm(x, mean=mean(dat$V1), sd=sd(dat$V1), add=TRUE, col="darkblue", lwd=2))
+
+#TEST for Normality using parametric tests
+
+# density plot
+
+library("ggpubr")
+ggdensity(dat$V1, main = "Density plot of V1", xlab = "value of V1")
+
+==> very skewed to the left and negatively skewed, so should not be considered normal
+
+# qqplot
+ggqqplot(dat$V1)
+
+==> points do not fall on the normal distribution line
+
+# apply Shapiro Wilkes hypothesis test
+shapiro.test(dat$V1)
+
+# STEP1) Transform negatively skewed to normal
+#https://medium.com/@TheDataGyan/day-8-data-transformation-skewness-normalization-and-much-more-4c144d370e55
+#try a squared transformation to see if turn into normal distribution
+
+test_V1 = dat$V1
+test_V1_squared = transform(test_V1, test_V1=test_V1^2)
+
+# density plot
+
+library("ggpubr")
+ggdensity(test_V1_squared$test_V1, main = "Density plot of V1", xlab = "value of V1")
+
+==> very skewed to the right and positively skewed, so should not be considered normal
+
+# qqplot
+ggqqplot(test_V1_squared$test_V1)
+
+==> still heavily skewed
+
+#try a cube root transformation to see if if truns into a normal distribution
+
+test_V1_cube_root = transform(test_V1, test_V1=test_V1^1/3)
+
+summary(test_V1_cube_root)
+     X_data             test_V1          
+ Min.   :-56.40751   Min.   :-18.802503  
+ 1st Qu.: -0.92037   1st Qu.: -0.306791  
+ Median :  0.01811   Median :  0.006036  
+ Mean   :  0.00000   Mean   :  0.000000  
+ 3rd Qu.:  1.31564   3rd Qu.:  0.438547  
+ Max.   :  2.45493   Max.   :  0.818310  
+
+==> still heavily skewed
+
+
+# STEP2) Next try to examine outliers
+install.packages("outliers")
+library(outliers)
+
+
+outlier(dat$V1)
+
+boxplot(dat$V1)
+
+#store outliers
+
+outliers <- boxplot(dat$V1, plot=FALSE)$out
+
+length(outliers)
+[1] 7062
+
+
+#now remove the outliers
+dat[which(dat$V1 %in% outliers),]
+
+dat <- dat[-which(dat$V1 %in% outliers),]
+
+boxplot(dat$V1)
+
+==> good, removed outliers
+
+
+#try to test normality again
+hist(dat$V1, breaks= 400, freq=FALSE)
+ggqqplot(dat$V1)
+
+==> still doesn't look normal
+
+#try a squared transformation to see if turn into normal distribution
+
+test_V1 = dat$V1
+test_V1_squared = transform(test_V1, test_V1=test_V1^2)
+
+# density plot
+
+library("ggpubr")
+ggdensity(test_V1_squared$test_V1, main = "Density plot of V1", xlab = "value of V1")
+
+==> very skewed to the right and positively skewed, so should not be considered normal
+
+# qqplot
+ggqqplot(test_V1_squared$test_V1)
+
+==> No, still not normal
+
+
+## STEP3) Try to fit the data to a Gamma or Weibull distribution rather than normal
+
+install.packages("MASS")
+library(MASS)
+
+install.packages("fitdistrplus")
+library(fitdistrplus)
+
+descdist(dat$V1, discrete=FALSE, boot=500)
+summary statistics
+------
+min:  -4.274178   max:  2.45493 
+median:  0.08022007 
+mean:  0.1861248 
+estimated sd:  1.454172 
+estimated skewness:  -0.4206471 
+estimated kurtosis:  2.419888 
+
+
+#there are neg values, but Weibull is only positive, so choose squared numbers
+
+descdist(test_V1_squared$test_V1, discrete=FALSE, boot=500)
+summary statistics
+------
+min:  2.03839e-10   max:  18.2686 
+median:  1.419499 
+mean:  2.14925 
+estimated sd:  2.383089 
+estimated skewness:  2.584292 
+estimated kurtosis:  13.17239 
+#Cullen and Frey graph show data is close to Gamma function (which is approx to Weibull)
+
+#try fitting Weibull (needs to be positive, so choose squared)
+fit_w  <- fitdist(test_V1_squared$test_V1, "weibull")
+
+
+denscomp(list(fit_w), legendtext = "Weibull")
+
+> summary(fit_w)
+Fitting of the distribution ' weibull ' by maximum likelihood 
+Parameters : 
+       estimate  Std. Error
+shape 0.8154029 0.001255350
+scale 1.9503199 0.004742327
+Loglikelihood:  -480504   AIC:  961012   BIC:  961033.1 
+Correlation matrix:
+          shape     scale
+shape 1.0000000 0.2896833
+scale 0.2896833 1.0000000
+
+==> OK match
+
+So choose values from a Weibull dist 
+shape 0.8154029
+scale 1.9503199 
+
+
+#generate 1000 elements
+weibull_dist = rweibull(1000, shape = 0.8154029, scale = 1.9503199)
+
+square_root_weibull_dist = transform(weibull_dist, weibull_dist=weibull_dist^1/2)
+
+> head(square_root_weibull_dist)
+     X_data weibull_dist
+1 0.2221130    0.1110565
+2 0.9653023    0.4826512
+3 8.0656714    4.0328357
+4 4.7051655    2.3525828
+5 3.2064863    1.6032431
+6 0.6276749    0.3138374
+
+
+## PROBLEM, missing any neg values ###
+
+need to shift original distribution to the right by so to line up with 0, then only positive numbers
+and do the procedure again
+
+
+save.image(file='r_image.RData')
+
+
+
+
+
+
